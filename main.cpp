@@ -83,6 +83,33 @@ BinaryImage dilate(const BinaryImage & image, const StructuringElement & element
   return BinaryImage(image.rows(), image.cols(), std::move(output));
 }
 
+BinaryImage erode(const BinaryImage & image, const StructuringElement & element)
+{
+  std::vector<int> output(image.rows() * image.cols(), 1);
+  const auto row_radius = static_cast<std::ptrdiff_t>(element.rows() / 2);
+  const auto col_radius = static_cast<std::ptrdiff_t>(element.cols() / 2);
+
+  for (std::size_t row = 0; row < image.rows(); ++row) {
+    for (std::size_t col = 0; col < image.cols(); ++col) {
+      for (std::size_t erow = 0; erow < element.rows() && output[row * image.cols() + col] == 1; ++erow) {
+        for (std::size_t ecol = 0; ecol < element.cols(); ++ecol) {
+          const auto image_row = static_cast<std::ptrdiff_t>(row) + static_cast<std::ptrdiff_t>(erow) - row_radius;
+          const auto image_col = static_cast<std::ptrdiff_t>(col) + static_cast<std::ptrdiff_t>(ecol) - col_radius;
+          if (element.at(erow, ecol) == 1 &&
+              (image_row < 0 || image_col < 0 ||
+              image_row >= static_cast<std::ptrdiff_t>(image.rows()) ||
+              image_col >= static_cast<std::ptrdiff_t>(image.cols()) ||
+              image.at(static_cast<std::size_t>(image_row), static_cast<std::size_t>(image_col)) == 0)) {
+            output[row * image.cols() + col] = 0;
+            break;
+          }
+        }
+      }
+    }
+  }
+  return BinaryImage(image.rows(), image.cols(), std::move(output));
+}
+
 BinaryImage readImage(std::istream & input)
 {
   long long entered_rows;
@@ -134,6 +161,12 @@ void runSelfCheck()
       assert(result.at(row, col) == (row >= 1 && row <= 5 && col >= 1 && col <= 5));
     }
   }
+  const BinaryImage recovered = erode(result, square_5x5);
+  for (std::size_t row = 0; row < recovered.rows(); ++row) {
+    for (std::size_t col = 0; col < recovered.cols(); ++col) {
+      assert(recovered.at(row, col) == single_pixel.at(row, col));
+    }
+  }
 
   const StructuringElement cross_3x3(3, 3, {
     0, 1, 0,
@@ -162,16 +195,24 @@ int main(int argc, char * argv[])
 {
   try {
     runSelfCheck();
-    const bool use_demo = argc == 2 && std::string(argv[1]) == "--demo";
-    if (argc > 1 && !use_demo) {
-      throw std::invalid_argument("only --demo is supported as an argument");
+    bool use_demo = false;
+    bool use_erosion = false;
+    for (int index = 1; index < argc; ++index) {
+      const std::string option(argv[index]);
+      if (option == "--demo") {
+        use_demo = true;
+      } else if (option == "--erode") {
+        use_erosion = true;
+      } else {
+        throw std::invalid_argument("supported options are --demo and --erode");
+      }
     }
 
     const BinaryImage input = use_demo ? demoImage() : readImage(std::cin);
     const StructuringElement square_5x5(5, 5, std::vector<int>(25, 1));
-    print(dilate(input, square_5x5));
+    print(use_erosion ? erode(input, square_5x5) : dilate(input, square_5x5));
   } catch (const std::exception & error) {
-    std::cerr << "Usage: rows cols followed by rows*cols binary pixels, or --demo\n";
+    std::cerr << "Usage: [--demo] [--erode] with rows cols and binary pixels on standard input\n";
     std::cerr << "Error: " << error.what() << '\n';
     return 1;
   }
