@@ -1,7 +1,9 @@
 #include <cassert>
 #include <cstddef>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -81,6 +83,29 @@ BinaryImage dilate(const BinaryImage & image, const StructuringElement & element
   return BinaryImage(image.rows(), image.cols(), std::move(output));
 }
 
+BinaryImage readImage(std::istream & input)
+{
+  long long entered_rows;
+  long long entered_cols;
+  if (!(input >> entered_rows >> entered_cols) || entered_rows <= 0 || entered_cols <= 0) {
+    throw std::invalid_argument("expected positive row and column counts");
+  }
+
+  const auto rows = static_cast<std::size_t>(entered_rows);
+  const auto cols = static_cast<std::size_t>(entered_cols);
+  if (cols > std::numeric_limits<std::size_t>::max() / rows) {
+    throw std::invalid_argument("image dimensions are too large");
+  }
+
+  std::vector<int> pixels(rows * cols);
+  for (int & pixel : pixels) {
+    if (!(input >> pixel)) {
+      throw std::invalid_argument("not enough pixel values");
+    }
+  }
+  return BinaryImage(rows, cols, std::move(pixels));
+}
+
 void print(const BinaryImage & image)
 {
   for (std::size_t row = 0; row < image.rows(); ++row) {
@@ -90,19 +115,19 @@ void print(const BinaryImage & image)
   }
 }
 
-int main()
+void runSelfCheck()
 {
-  const BinaryImage input(7, 7, {
+  const BinaryImage single_pixel(7, 7, {
+    0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 1, 0, 0, 0,
-    0, 0, 0, 0, 1, 0, 0,
-    0, 0, 0, 1, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 1, 0,
+    0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0,
   });
   const StructuringElement square_5x5(5, 5, std::vector<int>(25, 1));
-  const BinaryImage result = dilate(input, square_5x5);
+  const BinaryImage result = dilate(single_pixel, square_5x5);
 
   for (std::size_t row = 0; row < result.rows(); ++row) {
     for (std::size_t col = 0; col < result.cols(); ++col) {
@@ -115,10 +140,39 @@ int main()
     1, 1, 1,
     0, 1, 0,
   });
-  const BinaryImage cross_result = dilate(input, cross_3x3);
+  const BinaryImage cross_result = dilate(single_pixel, cross_3x3);
   assert(cross_result.at(2, 3) == 1 && cross_result.at(3, 2) == 1);
   assert(cross_result.at(2, 2) == 0);
+}
 
-  std::cout << "5x5 dilation result:\n";
-  print(result);
+BinaryImage demoImage()
+{
+  return BinaryImage(7, 7, {
+    0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 1, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 1, 0,
+    0, 0, 0, 0, 0, 0, 0,
+  });
+}
+
+int main(int argc, char * argv[])
+{
+  try {
+    runSelfCheck();
+    const bool use_demo = argc == 2 && std::string(argv[1]) == "--demo";
+    if (argc > 1 && !use_demo) {
+      throw std::invalid_argument("only --demo is supported as an argument");
+    }
+
+    const BinaryImage input = use_demo ? demoImage() : readImage(std::cin);
+    const StructuringElement square_5x5(5, 5, std::vector<int>(25, 1));
+    print(dilate(input, square_5x5));
+  } catch (const std::exception & error) {
+    std::cerr << "Usage: rows cols followed by rows*cols binary pixels, or --demo\n";
+    std::cerr << "Error: " << error.what() << '\n';
+    return 1;
+  }
 }
