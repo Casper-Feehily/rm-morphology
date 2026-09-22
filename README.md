@@ -17,6 +17,14 @@ ctest --test-dir build --output-on-failure
 
 `ctest` 会运行正方形膨胀、腐蚀与圆角膨胀示例；程序内置断言检查对应结果。
 
+## 终端可视化
+
+`--visualize` 由 C++ 程序直接输出输入图像、5×5 结构元素和计算结果；`██` 表示前景，`··` 表示背景。
+
+```bash
+build/morphology_dilation --demo --rounded --visualize
+```
+
 ## 输入与运行
 
 标准输入格式为第一行 `行数 列数`，后接 `行数 × 列数` 个 `0` 或 `1`，空白字符可任意分隔。

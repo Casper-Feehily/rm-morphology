@@ -134,6 +134,26 @@ void print(const BinaryImage & image)
   }
 }
 
+void printBlocks(const BinaryImage & image)
+{
+  for (std::size_t row = 0; row < image.rows(); ++row) {
+    for (std::size_t col = 0; col < image.cols(); ++col) {
+      std::cout << (image.at(row, col) ? "██" : "··");
+    }
+    std::cout << '\n';
+  }
+}
+
+void printBlocks(const std::vector<int> & mask, std::size_t rows, std::size_t cols)
+{
+  for (std::size_t row = 0; row < rows; ++row) {
+    for (std::size_t col = 0; col < cols; ++col) {
+      std::cout << (mask[row * cols + col] ? "██" : "··");
+    }
+    std::cout << '\n';
+  }
+}
+
 void runSelfCheck()
 {
   const BinaryImage single_pixel(7, 7, {
@@ -206,6 +226,7 @@ int main(int argc, char * argv[])
     bool use_demo = false;
     bool use_erosion = false;
     bool use_rounded = false;
+    bool use_visualization = false;
     for (int index = 1; index < argc; ++index) {
       const std::string option(argv[index]);
       if (option == "--demo") {
@@ -214,28 +235,43 @@ int main(int argc, char * argv[])
         use_erosion = true;
       } else if (option == "--rounded") {
         use_rounded = true;
+      } else if (option == "--visualize") {
+        use_visualization = true;
       } else {
-        throw std::invalid_argument("supported options are --demo, --erode, and --rounded");
+        throw std::invalid_argument("supported options are --demo, --erode, --rounded, and --visualize");
       }
     }
 
     const BinaryImage input = use_demo ? demoImage() : readImage(std::cin);
-    const StructuringElement square_5x5(5, 5, std::vector<int>(25, 1));
-    const StructuringElement disk_5x5(5, 5, {
+    const std::vector<int> square_mask(25, 1);
+    const std::vector<int> disk_mask = {
       0, 0, 1, 0, 0,
       0, 1, 1, 1, 0,
       1, 1, 1, 1, 1,
       0, 1, 1, 1, 0,
       0, 0, 1, 0, 0,
-    });
+    };
+    const StructuringElement square_5x5(5, 5, square_mask);
+    const StructuringElement disk_5x5(5, 5, disk_mask);
     const StructuringElement & element = use_rounded ? disk_5x5 : square_5x5;
+    const std::vector<int> & mask = use_rounded ? disk_mask : square_mask;
     const std::string operation_name = use_erosion
       ? (use_rounded ? "圆角结构元素腐蚀" : "正方形结构元素腐蚀")
       : (use_rounded ? "圆角膨胀" : "正方形膨胀");
-    std::cout << "\n----- " << operation_name << "结果 -----\n";
-    print(use_erosion ? erode(input, element) : dilate(input, element));
+    const BinaryImage result = use_erosion ? erode(input, element) : dilate(input, element);
+    if (use_visualization) {
+      std::cout << "\n输入图像（██ 为前景，·· 为背景）\n";
+      printBlocks(input);
+      std::cout << "\n5×5 结构元素\n";
+      printBlocks(mask, 5, 5);
+      std::cout << "\n----- " << operation_name << "结果 -----\n";
+      printBlocks(result);
+    } else {
+      std::cout << "\n----- " << operation_name << "结果 -----\n";
+      print(result);
+    }
   } catch (const std::exception & error) {
-    std::cerr << "Usage: [--demo] [--erode] [--rounded] with rows cols and binary pixels on standard input\n";
+    std::cerr << "Usage: [--demo] [--erode] [--rounded] [--visualize] with rows cols and binary pixels on standard input\n";
     std::cerr << "Error: " << error.what() << '\n';
     return 1;
   }
