@@ -176,6 +176,22 @@ void runSelfCheck()
   const BinaryImage cross_result = dilate(single_pixel, cross_3x3);
   assert(cross_result.at(2, 3) == 1 && cross_result.at(3, 2) == 1);
   assert(cross_result.at(2, 2) == 0);
+
+  const StructuringElement disk_5x5(5, 5, {
+    0, 0, 1, 0, 0,
+    0, 1, 1, 1, 0,
+    1, 1, 1, 1, 1,
+    0, 1, 1, 1, 0,
+    0, 0, 1, 0, 0,
+  });
+  const BinaryImage rounded = dilate(single_pixel, disk_5x5);
+  for (std::size_t row = 0; row < rounded.rows(); ++row) {
+    for (std::size_t col = 0; col < rounded.cols(); ++col) {
+      const int row_offset = static_cast<int>(row) - 3;
+      const int col_offset = static_cast<int>(col) - 3;
+      assert(rounded.at(row, col) == (row_offset * row_offset + col_offset * col_offset <= 4));
+    }
+  }
 }
 
 BinaryImage demoImage()
@@ -197,22 +213,33 @@ int main(int argc, char * argv[])
     runSelfCheck();
     bool use_demo = false;
     bool use_erosion = false;
+    bool use_rounded = false;
     for (int index = 1; index < argc; ++index) {
       const std::string option(argv[index]);
       if (option == "--demo") {
         use_demo = true;
       } else if (option == "--erode") {
         use_erosion = true;
+      } else if (option == "--rounded") {
+        use_rounded = true;
       } else {
-        throw std::invalid_argument("supported options are --demo and --erode");
+        throw std::invalid_argument("supported options are --demo, --erode, and --rounded");
       }
     }
 
     const BinaryImage input = use_demo ? demoImage() : readImage(std::cin);
     const StructuringElement square_5x5(5, 5, std::vector<int>(25, 1));
-    print(use_erosion ? erode(input, square_5x5) : dilate(input, square_5x5));
+    const StructuringElement disk_5x5(5, 5, {
+      0, 0, 1, 0, 0,
+      0, 1, 1, 1, 0,
+      1, 1, 1, 1, 1,
+      0, 1, 1, 1, 0,
+      0, 0, 1, 0, 0,
+    });
+    const StructuringElement & element = use_rounded ? disk_5x5 : square_5x5;
+    print(use_erosion ? erode(input, element) : dilate(input, element));
   } catch (const std::exception & error) {
-    std::cerr << "Usage: [--demo] [--erode] with rows cols and binary pixels on standard input\n";
+    std::cerr << "Usage: [--demo] [--erode] [--rounded] with rows cols and binary pixels on standard input\n";
     std::cerr << "Error: " << error.what() << '\n';
     return 1;
   }

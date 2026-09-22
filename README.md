@@ -3,7 +3,7 @@
 
 # 二值图像形态学
 
-使用 C++17 实现的 5×5 正方形结构元素膨胀和腐蚀，无第三方依赖。
+使用 C++17 实现的 5×5 正方形结构元素膨胀和腐蚀，并支持 5×5 圆盘结构元素的圆角膨胀，无第三方依赖。
 
 ## 构建与测试
 
@@ -15,7 +15,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-`ctest` 会运行膨胀与腐蚀示例；程序内置断言检查单点经 5×5 膨胀后形成 5×5 方块，随后腐蚀恢复为单点。
+`ctest` 会运行正方形膨胀、腐蚀与圆角膨胀示例；程序内置断言检查对应结果。
 
 ## 输入与运行
 
@@ -25,13 +25,24 @@ ctest --test-dir build --output-on-failure
 printf '7 7\n0 0 0 0 0 0 0\n0 0 0 0 0 0 0\n0 0 0 0 0 0 0\n0 0 0 1 0 0 0\n0 0 0 0 0 0 0\n0 0 0 0 0 0 0\n0 0 0 0 0 0 0\n' | build/morphology_dilation
 ```
 
-默认执行膨胀；添加 `--erode` 执行腐蚀。`--demo` 使用内置样例，可与 `--erode` 组合。
+默认使用 5×5 正方形结构元素膨胀；添加 `--erode` 执行腐蚀。`--rounded` 选择 5×5 离散圆盘结构元素，使膨胀边角呈圆形。`--demo` 使用内置样例，选项可组合。
 
 ```bash
 build/morphology_dilation --demo
 build/morphology_dilation --demo --erode
+build/morphology_dilation --demo --rounded
 ```
 
 ## 实现要点
 
-`StructuringElement` 以掩码参数传入，因此膨胀和腐蚀可以替换结构元素。膨胀只要任一有效掩码位置命中前景就输出 `1`；腐蚀要求所有有效掩码位置均为前景。图像外按背景 `0` 处理。
+`StructuringElement` 以掩码参数传入，因此膨胀和腐蚀可以替换结构元素。圆角模式使用以下离散圆盘：
+
+```text
+0 0 1 0 0
+0 1 1 1 0
+1 1 1 1 1
+0 1 1 1 0
+0 0 1 0 0
+```
+
+膨胀只要任一有效掩码位置命中前景就输出 `1`；腐蚀要求所有有效掩码位置均为前景。图像外按背景 `0` 处理。
