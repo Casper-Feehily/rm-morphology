@@ -114,6 +114,7 @@ BinaryImage readImage(std::istream & input)
 {
   long long entered_rows;
   long long entered_cols;
+  std::cout << "请输入图像尺寸（行 列）：";
   if (!(input >> entered_rows >> entered_cols) || entered_rows <= 0 || entered_cols <= 0) {
     throw std::invalid_argument("expected positive row and column counts");
   }
@@ -125,6 +126,7 @@ BinaryImage readImage(std::istream & input)
   }
 
   std::vector<int> pixels(rows * cols);
+  std::cout << "请输入 " << pixels.size() << " 个 0/1 像素：\n";
   for (int & pixel : pixels) {
     if (!(input >> pixel)) {
       throw std::invalid_argument("not enough pixel values");
@@ -237,6 +239,10 @@ int main(int argc, char * argv[])
       0, 0, 1, 0, 0,
     });
     const StructuringElement & element = use_rounded ? disk_5x5 : square_5x5;
+    const std::string operation_name = use_erosion
+      ? (use_rounded ? "圆角结构元素腐蚀" : "正方形结构元素腐蚀")
+      : (use_rounded ? "圆角膨胀" : "正方形膨胀");
+    std::cout << "\n----- " << operation_name << "结果 -----\n";
     print(use_erosion ? erode(input, element) : dilate(input, element));
   } catch (const std::exception & error) {
     std::cerr << "Usage: [--demo] [--erode] [--rounded] with rows cols and binary pixels on standard input\n";
