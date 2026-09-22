@@ -32,51 +32,52 @@ private:
   std::vector<int> pixels_;
 };
 
+using Offset = std::pair<std::ptrdiff_t, std::ptrdiff_t>;
+
 class StructuringElement {
 public:
-  StructuringElement(std::size_t rows, std::size_t cols, std::vector<int> mask)
-  : rows_(rows), cols_(cols), mask_(std::move(mask))
+  StructuringElement(std::size_t rows, std::size_t cols, const std::vector<int> & mask)
   {
-    if (rows == 0 || cols == 0 || rows % 2 == 0 || cols % 2 == 0 || mask_.size() != rows * cols) {
+    if (rows == 0 || cols == 0 || rows % 2 == 0 || cols % 2 == 0 || mask.size() != rows * cols) {
       throw std::invalid_argument("structuring element must have odd dimensions");
     }
-    for (int value : mask_) {
+    for (std::size_t index = 0; index < mask.size(); ++index) {
+      const int value = mask[index];
       if (value != 0 && value != 1) {
         throw std::invalid_argument("structuring element values must be 0 or 1");
+      }
+      if (value == 1) {
+        active_offsets_.emplace_back(
+          static_cast<std::ptrdiff_t>(index / cols) - static_cast<std::ptrdiff_t>(rows / 2),
+          static_cast<std::ptrdiff_t>(index % cols) - static_cast<std::ptrdiff_t>(cols / 2));
       }
     }
   }
 
-  int at(std::size_t row, std::size_t col) const { return mask_[row * cols_ + col]; }
-  std::size_t rows() const { return rows_; }
-  std::size_t cols() const { return cols_; }
+  const std::vector<Offset> & offsets() const { return active_offsets_; }
 
 private:
-  std::size_t rows_;
-  std::size_t cols_;
-  std::vector<int> mask_;
+  std::vector<Offset> active_offsets_;
 };
+
+bool isForeground(const BinaryImage & image, std::ptrdiff_t row, std::ptrdiff_t col)
+{
+  return row >= 0 && col >= 0 &&
+         row < static_cast<std::ptrdiff_t>(image.rows()) &&
+         col < static_cast<std::ptrdiff_t>(image.cols()) &&
+         image.at(static_cast<std::size_t>(row), static_cast<std::size_t>(col)) == 1;
+}
 
 BinaryImage dilate(const BinaryImage & image, const StructuringElement & element)
 {
   std::vector<int> output(image.rows() * image.cols(), 0);
-  const auto row_radius = static_cast<std::ptrdiff_t>(element.rows() / 2);
-  const auto col_radius = static_cast<std::ptrdiff_t>(element.cols() / 2);
-
-  for (std::size_t row = 0; row < image.rows(); ++row) {
-    for (std::size_t col = 0; col < image.cols(); ++col) {
-      for (std::size_t erow = 0; erow < element.rows() && output[row * image.cols() + col] == 0; ++erow) {
-        for (std::size_t ecol = 0; ecol < element.cols(); ++ecol) {
-          const auto image_row = static_cast<std::ptrdiff_t>(row) + static_cast<std::ptrdiff_t>(erow) - row_radius;
-          const auto image_col = static_cast<std::ptrdiff_t>(col) + static_cast<std::ptrdiff_t>(ecol) - col_radius;
-          if (element.at(erow, ecol) == 1 && image_row >= 0 && image_col >= 0 &&
-              image_row < static_cast<std::ptrdiff_t>(image.rows()) &&
-              image_col < static_cast<std::ptrdiff_t>(image.cols()) &&
-              image.at(static_cast<std::size_t>(image_row), static_cast<std::size_t>(image_col)) == 1) {
-            output[row * image.cols() + col] = 1;
-            break;
-          }
-        }
+  for (std::size_t index = 0; index < output.size(); ++index) {
+    const auto row = static_cast<std::ptrdiff_t>(index / image.cols());
+    const auto col = static_cast<std::ptrdiff_t>(index % image.cols());
+    for (const auto & [row_offset, col_offset] : element.offsets()) {
+      if (isForeground(image, row + row_offset, col + col_offset)) {
+        output[index] = 1;
+        break;
       }
     }
   }
@@ -86,24 +87,13 @@ BinaryImage dilate(const BinaryImage & image, const StructuringElement & element
 BinaryImage erode(const BinaryImage & image, const StructuringElement & element)
 {
   std::vector<int> output(image.rows() * image.cols(), 1);
-  const auto row_radius = static_cast<std::ptrdiff_t>(element.rows() / 2);
-  const auto col_radius = static_cast<std::ptrdiff_t>(element.cols() / 2);
-
-  for (std::size_t row = 0; row < image.rows(); ++row) {
-    for (std::size_t col = 0; col < image.cols(); ++col) {
-      for (std::size_t erow = 0; erow < element.rows() && output[row * image.cols() + col] == 1; ++erow) {
-        for (std::size_t ecol = 0; ecol < element.cols(); ++ecol) {
-          const auto image_row = static_cast<std::ptrdiff_t>(row) + static_cast<std::ptrdiff_t>(erow) - row_radius;
-          const auto image_col = static_cast<std::ptrdiff_t>(col) + static_cast<std::ptrdiff_t>(ecol) - col_radius;
-          if (element.at(erow, ecol) == 1 &&
-              (image_row < 0 || image_col < 0 ||
-              image_row >= static_cast<std::ptrdiff_t>(image.rows()) ||
-              image_col >= static_cast<std::ptrdiff_t>(image.cols()) ||
-              image.at(static_cast<std::size_t>(image_row), static_cast<std::size_t>(image_col)) == 0)) {
-            output[row * image.cols() + col] = 0;
-            break;
-          }
-        }
+  for (std::size_t index = 0; index < output.size(); ++index) {
+    const auto row = static_cast<std::ptrdiff_t>(index / image.cols());
+    const auto col = static_cast<std::ptrdiff_t>(index % image.cols());
+    for (const auto & [row_offset, col_offset] : element.offsets()) {
+      if (!isForeground(image, row + row_offset, col + col_offset)) {
+        output[index] = 0;
+        break;
       }
     }
   }
